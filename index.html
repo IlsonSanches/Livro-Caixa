@@ -312,11 +312,15 @@
       <div class="section-label">Saída</div>
       <div class="field-row"><label>Retiradas / despesas</label><input type="number" id="f_retiradas" step="0.01" value="0"></div>
 
+      <div class="section-label">Contagem física do caixa</div>
+      <div class="field-row"><label>Reserva</label><input type="number" id="f_reserva" step="0.01" value="0"></div>
+      <div class="field-row"><label>Moedas</label><input type="number" id="f_moedas" step="0.01" value="0"></div>
+
       <div class="totals">
         <div class="field-row"><label>Total recebido</label><span class="val" id="t_recebido">R$ 0,00</span></div>
         <div class="field-row"><label>Total vendido</label><span class="val" id="t_vendido">R$ 0,00</span></div>
         <div class="field-row diff" id="row_diff"><label>Diferença</label><span class="val" id="t_diff">R$ 0,00</span></div>
-        <div class="field-row"><label>Caixa final<span class="hint">contagem real, digite manualmente</span></label><input type="number" id="f_caixaFinal" step="0.01" value="0"></div>
+        <div class="field-row"><label>Caixa final<span class="hint">reserva + moedas + dinheiro</span></label><span class="val" id="t_caixaFinal">R$ 0,00</span></div>
       </div>
 
       <button class="btn" id="btnSalvar">Fechar o dia</button>
@@ -391,7 +395,7 @@ let config = { meta: 0 };
 let editingId = null;
 
 const inputs = ['f_data','f_caixaInicial','f_dinheiro','f_debitoInter','f_debitoStone','f_creditoInter','f_creditoStone','f_pixInter','f_pixConta','f_ifoodPg','f_ifoodVenda',
-  'f_vendaBalcao','f_vendaIfood','f_desconto','f_descIfood','f_nfe','f_retiradas','f_caixaFinal'];
+  'f_vendaBalcao','f_vendaIfood','f_desconto','f_descIfood','f_nfe','f_retiradas','f_reserva','f_moedas'];
 
 auth.onAuthStateChanged(user => {
   if(user){
@@ -455,8 +459,9 @@ function num(id){ return parseFloat($(id).value) || 0; }
 function computeTotals(){
   const recebido = num('f_dinheiro')+num('f_debitoInter')+num('f_debitoStone')+num('f_creditoInter')+num('f_creditoStone')+num('f_pixInter')+num('f_pixConta')+num('f_ifoodPg');
   const vendido = num('f_vendaBalcao')+num('f_vendaIfood')-num('f_desconto');
-  const diff = num('f_caixaInicial') + vendido - num('f_caixaFinal') - recebido;
-  return { recebido, vendido, diff };
+  const caixaFinal = num('f_reserva') + num('f_moedas') + num('f_dinheiro');
+  const diff = num('f_caixaInicial') + vendido - caixaFinal - recebido;
+  return { recebido, vendido, diff, caixaFinal };
 }
 
 function renderTotals(){
@@ -464,6 +469,7 @@ function renderTotals(){
   $('t_recebido').textContent = BRL(t.recebido);
   $('t_vendido').textContent = BRL(t.vendido);
   $('t_diff').textContent = BRL(t.diff);
+  $('t_caixaFinal').textContent = BRL(t.caixaFinal);
   const row = $('row_diff');
   row.classList.remove('diff-ok','diff-bad');
   row.classList.add(Math.abs(t.diff) < 0.01 ? 'diff-ok' : (t.diff < 0 ? 'diff-bad' : 'diff-ok'));
@@ -481,7 +487,7 @@ function resetForm(){
   editingId = null;
   $('f_data').value = todayISO();
   $('f_caixaInicial').value = lastCaixaFinal().toFixed(2);
-  ['f_dinheiro','f_debitoInter','f_debitoStone','f_creditoInter','f_creditoStone','f_pixInter','f_pixConta','f_ifoodPg','f_ifoodVenda','f_vendaBalcao','f_vendaIfood','f_desconto','f_descIfood','f_nfe','f_retiradas','f_caixaFinal']
+  ['f_dinheiro','f_debitoInter','f_debitoStone','f_creditoInter','f_creditoStone','f_pixInter','f_pixConta','f_ifoodPg','f_ifoodVenda','f_vendaBalcao','f_vendaIfood','f_desconto','f_descIfood','f_nfe','f_retiradas','f_reserva','f_moedas']
     .forEach(id => $(id).value = 0);
   $('btnSalvar').textContent = 'Fechar o dia';
   renderTotals();
@@ -506,7 +512,8 @@ $('btnSalvar').addEventListener('click', async () => {
     pixInter: num('f_pixInter'), pixConta: num('f_pixConta'), ifoodPg: num('f_ifoodPg'), ifoodVenda: num('f_ifoodVenda'),
     vendaBalcao: num('f_vendaBalcao'), vendaIfood: num('f_vendaIfood'),
     desconto: num('f_desconto'), descIfood: num('f_descIfood'), nfe: num('f_nfe'), retiradas: num('f_retiradas'),
-    recebido: t.recebido, vendido: t.vendido, diff: t.diff, caixaFinal: num('f_caixaFinal')
+    reserva: num('f_reserva'), moedas: num('f_moedas'),
+    recebido: t.recebido, vendido: t.vendido, diff: t.diff, caixaFinal: t.caixaFinal
   };
   try{
     await saveRecord(rec);
@@ -560,7 +567,7 @@ function loadIntoForm(r){
   $('f_vendaBalcao').value = r.vendaBalcao; $('f_vendaIfood').value = r.vendaIfood;
   $('f_desconto').value = r.desconto; $('f_descIfood').value = r.descIfood || 0;
   $('f_nfe').value = r.nfe; $('f_retiradas').value = r.retiradas;
-  $('f_caixaFinal').value = r.caixaFinal || 0;
+  $('f_reserva').value = r.reserva || 0; $('f_moedas').value = r.moedas || 0;
   $('btnSalvar').textContent = 'Atualizar fechamento de ' + r.data.split('-').reverse().join('/');
   renderTotals();
   window.scrollTo({top:0, behavior:'smooth'});
