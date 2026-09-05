@@ -576,7 +576,7 @@ function renderMonth(){
   const now = new Date();
   const ym = now.toISOString().slice(0,7);
   const doMes = records.filter(r => r.data.startsWith(ym));
-  const mesTotal = doMes.reduce((s,r)=> s + r.recebido, 0);
+  const mesTotal = doMes.reduce((s,r)=> s + r.vendido, 0);
   $('mesTotal').textContent = BRL(mesTotal);
   const meta = config.meta || 0;
   const pct = meta > 0 ? Math.min(100, (mesTotal/meta)*100) : 0;
@@ -584,11 +584,10 @@ function renderMonth(){
   $('metaPct').textContent = meta > 0 ? pct.toFixed(0) + '%' : '';
 
   const diasFechados = doMes.length;
-  const totalVendidoMes = doMes.reduce((s,r)=> s + r.vendido, 0);
-  const mediaDiaria = diasFechados > 0 ? totalVendidoMes / diasFechados : 0;
+  const mediaDiaria = diasFechados > 0 ? mesTotal / diasFechados : 0;
   const diasNoMes = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
   const diasRestantes = Math.max(0, diasNoMes - now.getDate());
-  const estimativa = totalVendidoMes + (mediaDiaria * diasRestantes);
+  const estimativa = mesTotal + (mediaDiaria * diasRestantes);
   $('estimativa').textContent = BRL(estimativa);
 }
 
