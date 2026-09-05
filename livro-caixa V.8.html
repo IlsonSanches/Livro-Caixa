@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Livro Caixa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<style>
+  :root{
+    --paper:#F1ECDF;
+    --paper-2:#E9E2CF;
+    --ink:#1F2A24;
+    --green:#21463A;
+    --green-2:#2C5B4A;
+    --brick:#A63A2E;
+    --brick-bg:#F3DEDA;
+    --gold:#B8873B;
+    --gold-bg:#F1E4C9;
+    --line:#C9BFA4;
+    --muted:#6B6558;
+    --ok-bg:#E1E9DC;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:#DAD3BE;
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(0,0,0,.03), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(0,0,0,.04), transparent 45%);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:28px 16px 60px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;}
+
+  header.top{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    padding:0 6px 18px;
+    border-bottom:2px solid var(--ink);
+    margin-bottom:22px;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  header.top h1{
+    font-family:'Fraunces', serif;
+    font-optical-sizing:auto;
+    font-weight:600;
+    font-size:34px;
+    margin:0;
+    letter-spacing:.2px;
+  }
+  header.top .biz{
+    font-family:'Fraunces', serif;
+    font-style:italic;
+    color:var(--green);
+    font-weight:500;
+  }
+  header.top .today{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    color:var(--muted);
+    padding-bottom:6px;
+  }
+
+  .ledger{
+    display:grid;
+    grid-template-columns:1.05fr 1.4fr;
+    gap:0;
+    background:var(--paper);
+    box-shadow:0 18px 40px rgba(31,42,36,.18), 0 2px 0 rgba(0,0,0,.05);
+    border-radius:3px;
+    overflow:hidden;
+    position:relative;
+  }
+  .ledger::before{
+    content:"";
+    position:absolute;
+    left:calc(1.05fr / (1.05 + 1.4) * 100% - 1px);
+    top:0; bottom:0;
+    width:2px;
+    background:linear-gradient(to bottom, transparent, rgba(0,0,0,.12) 8%, rgba(0,0,0,.12) 92%, transparent);
+    display:none;
+  }
+  @media(min-width:900px){ .ledger::before{ display:block; } }
+
+  .page{ padding:30px 34px 36px; }
+  .page.left{ background:var(--paper); border-right:1px dashed var(--line); }
+  .page.right{ background:var(--paper-2); }
+
+  .section-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:.06em;
+    color:var(--muted);
+    margin:22px 0 10px;
+    padding-bottom:6px;
+    border-bottom:1px solid var(--line);
+  }
+  .section-label.first{ margin-top:0; }
+
+  .field-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:7px 0;
+    gap:12px;
+  }
+  .field-row label{ font-size:14.5px; color:var(--ink); }
+  .field-row .hint, .row1 .hint{ display:block; font-size:11.5px; color:var(--muted); margin-top:1px; font-family:'IBM Plex Sans', sans-serif; font-weight:400; }
+  .field-row input[type=number], .field-row input[type=date]{
+    width:150px;
+    text-align:right;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:15px;
+    border:none;
+    border-bottom:1.5px solid var(--line);
+    background:transparent;
+    padding:5px 2px;
+    color:var(--ink);
+    outline:none;
+    transition:border-color .15s ease;
+  }
+  .field-row input[type=date]{ width:150px; text-align:left; }
+  .field-row input:focus{ border-color:var(--green); }
+  .field-row input:disabled{ color:var(--muted); }
+
+  .totals{
+    margin-top:22px;
+    padding-top:16px;
+    border-top:2px solid var(--ink);
+  }
+  .totals .field-row{ font-family:'IBM Plex Mono', monospace; }
+  .totals .field-row label{ font-family:'IBM Plex Sans', sans-serif; font-weight:500; }
+  .totals .field-row.diff span.val{ font-size:19px; font-weight:600; padding:3px 10px; border-radius:3px; }
+  .diff-ok .val{ background:var(--ok-bg); color:var(--green); }
+  .diff-bad .val{ background:var(--brick-bg); color:var(--brick); }
+
+  .btn{
+    margin-top:20px;
+    width:100%;
+    padding:13px 16px;
+    background:var(--green);
+    color:var(--paper);
+    border:none;
+    border-radius:3px;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-weight:600;
+    font-size:15px;
+    cursor:pointer;
+    letter-spacing:.2px;
+    transition:background .15s ease, transform .1s ease;
+  }
+  .btn:hover{ background:var(--green-2); }
+  .btn:active{ transform:scale(.99); }
+  .btn.secondary{
+    background:transparent;
+    color:var(--muted);
+    border:1.5px solid var(--line);
+    margin-top:8px;
+  }
+  .btn.secondary:hover{ color:var(--ink); border-color:var(--muted); background:transparent;}
+
+  /* right page */
+  .tape-box{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:14px 16px 8px;
+    box-shadow:inset 0 1px 3px rgba(0,0,0,.06);
+  }
+  .tape-box h3{
+    font-family:'Fraunces', serif;
+    font-size:17px;
+    margin:0 0 4px;
+    font-weight:600;
+  }
+  .tape-box p.sub{ margin:0 0 8px; font-size:12.5px; color:var(--muted); }
+  .tape-box .field-row{ padding:6px 0; }
+  .tape-box .field-row span{ font-family:'IBM Plex Mono', monospace; font-size:14.5px; }
+  .tape-box .field-row:not(:last-child){ border-bottom:1px solid var(--line); }
+
+  .meta-box{
+    margin-top:16px;
+    padding:14px 16px;
+    background:var(--gold-bg);
+    border-radius:3px;
+    border:1px solid var(--gold);
+  }
+  .meta-box .row1{ display:flex; justify-content:space-between; align-items:baseline; font-family:'IBM Plex Mono', monospace; font-size:13px; margin-bottom:8px;}
+  .meta-box .row1 b{ font-size:16px; }
+  .meta-edit{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); margin-top:8px;}
+  .meta-edit input{ width:100px; font-family:'IBM Plex Mono', monospace; border:none; border-bottom:1px solid var(--gold); background:transparent; text-align:right; padding:2px; outline:none;}
+  .bar-track{ height:8px; border-radius:4px; background:rgba(0,0,0,.08); overflow:hidden; }
+  .bar-fill{ height:100%; background:var(--green); border-radius:4px; transition:width .3s ease; }
+
+  .hist{ margin-top:20px; }
+  .hist h3{ font-family:'Fraunces', serif; font-size:17px; margin:0 0 10px; font-weight:600; }
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  thead th{
+    text-align:right;
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:500;
+    color:var(--muted);
+    font-size:11px;
+    padding:0 6px 6px;
+    border-bottom:1px solid var(--ink);
+  }
+  thead th:first-child, tbody td:first-child{ text-align:left; }
+  tbody td{
+    padding:8px 6px;
+    border-bottom:1px solid var(--line);
+    text-align:right;
+    font-family:'IBM Plex Mono', monospace;
+    cursor:pointer;
+  }
+  tbody tr:hover{ background:rgba(33,70,58,.06); }
+  tbody td.diff-pos{ color:var(--green); font-weight:600; }
+  tbody td.diff-neg{ color:var(--brick); font-weight:600; }
+  tbody td.del{ cursor:pointer; color:var(--muted); font-family:'IBM Plex Sans', sans-serif; text-align:center; width:24px;}
+  tbody td.del:hover{ color:var(--brick); }
+  .empty{ padding:22px 6px; color:var(--muted); font-size:13px; text-align:center; }
+
+  @media(max-width:899px){
+    .ledger{ grid-template-columns:1fr; }
+    .page.left{ border-right:none; border-bottom:1px dashed var(--line); }
+  }
+
+  #loginOverlay{
+    position:fixed; inset:0; background:#DAD3BE;
+    display:flex; align-items:center; justify-content:center;
+    z-index:100;
+  }
+  #loginOverlay.hidden{ display:none; }
+  .login-card{
+    background:var(--paper);
+    padding:34px 32px;
+    border-radius:4px;
+    box-shadow:0 18px 40px rgba(31,42,36,.2);
+    width:100%; max-width:320px;
+  }
+  .login-card h2{ font-family:'Fraunces', serif; margin:0 0 4px; font-size:24px; }
+  .login-card p{ font-size:13px; color:var(--muted); margin:0 0 20px; }
+  .login-card input{
+    width:100%; padding:10px 10px; margin-bottom:12px;
+    border:1.5px solid var(--line); border-radius:3px;
+    font-family:'IBM Plex Sans', sans-serif; font-size:14px;
+    background:#fff; outline:none;
+  }
+  .login-card input:focus{ border-color:var(--green); }
+  .login-erro{ color:var(--brick); font-size:12.5px; min-height:16px; margin-bottom:8px; }
+  #app-content.hidden{ display:none; }
+</style>
+</head>
+<body>
+
+<div id="loginOverlay">
+  <div class="login-card">
+    <h2>Livro Caixa</h2>
+    <p>Entre com seu e-mail e senha cadastrados no Firebase.</p>
+    <input type="email" id="loginEmail" placeholder="E-mail" autocomplete="username">
+    <input type="password" id="loginSenha" placeholder="Senha" autocomplete="current-password">
+    <div class="login-erro" id="loginErro"></div>
+    <button class="btn" id="btnLogin" style="margin-top:0;">Entrar</button>
+  </div>
+</div>
+
+<div class="wrap hidden" id="app-content">
+  <header class="top">
+    <div>
+      <h1>Livro Caixa <span class="biz">· Jet Chicken</span></h1>
+    </div>
+    <div class="today" id="todayLabel"></div>
+  </header>
+
+  <div class="ledger">
+    <div class="page left">
+      <div class="section-label first">Fechamento do dia</div>
+      <div class="field-row">
+        <label>Data</label>
+        <input type="date" id="f_data">
+      </div>
+      <div class="field-row">
+        <label>Caixa inicial<span class="hint">puxado do caixa final anterior</span></label>
+        <input type="number" id="f_caixaInicial" step="0.01">
+      </div>
+
+      <div class="section-label">Recebido</div>
+      <div class="field-row"><label>Dinheiro</label><input type="number" id="f_dinheiro" step="0.01" value="0"></div>
+      <div class="field-row"><label>Débito Inter</label><input type="number" id="f_debitoInter" step="0.01" value="0"></div>
+      <div class="field-row"><label>Débito Stone</label><input type="number" id="f_debitoStone" step="0.01" value="0"></div>
+      <div class="field-row"><label>Crédito Inter</label><input type="number" id="f_creditoInter" step="0.01" value="0"></div>
+      <div class="field-row"><label>Crédito Stone</label><input type="number" id="f_creditoStone" step="0.01" value="0"></div>
+      <div class="field-row"><label>PIX Inter</label><input type="number" id="f_pixInter" step="0.01" value="0"></div>
+      <div class="field-row"><label>PIX Conta</label><input type="number" id="f_pixConta" step="0.01" value="0"></div>
+      <div class="field-row"><label>iFood (pago no app)</label><input type="number" id="f_ifoodPg" step="0.01" value="0"></div>
+
+      <div class="section-label">Vendido</div>
+      <div class="field-row"><label>Venda balcão</label><input type="number" id="f_vendaBalcao" step="0.01" value="0"></div>
+      <div class="field-row"><label>Venda iFood</label><input type="number" id="f_vendaIfood" step="0.01" value="0"></div>
+      <div class="field-row"><label>Descontos</label><input type="number" id="f_desconto" step="0.01" value="0"></div>
+      <div class="field-row"><label>NFE emitidas<span class="hint">informativo</span></label><input type="number" id="f_nfe" step="0.01" value="0"></div>
+
+      <div class="section-label">Saída</div>
+      <div class="field-row"><label>Retiradas / despesas</label><input type="number" id="f_retiradas" step="0.01" value="0"></div>
+
+      <div class="totals">
+        <div class="field-row"><label>Total recebido</label><span class="val" id="t_recebido">R$ 0,00</span></div>
+        <div class="field-row"><label>Total vendido</label><span class="val" id="t_vendido">R$ 0,00</span></div>
+        <div class="field-row diff" id="row_diff"><label>Diferença</label><span class="val" id="t_diff">R$ 0,00</span></div>
+        <div class="field-row"><label>Caixa final<span class="hint">contagem real, digite manualmente</span></label><input type="number" id="f_caixaFinal" step="0.01" value="0"></div>
+      </div>
+
+      <button class="btn" id="btnSalvar">Fechar o dia</button>
+      <button class="btn secondary" id="btnNovo">Começar novo lançamento</button>
+    </div>
+
+    <div class="page right">
+      <div class="tape-box">
+        <h3>Totalizadores do mês</h3>
+        <p class="sub">Soma de cada forma de recebimento nos dias fechados deste mês</p>
+        <div class="field-row"><label>Débito</label><span class="val" id="tot_debito">R$ 0,00</span></div>
+        <div class="field-row"><label>Crédito</label><span class="val" id="tot_credito">R$ 0,00</span></div>
+        <div class="field-row"><label>iFood pago</label><span class="val" id="tot_ifood">R$ 0,00</span></div>
+        <div class="field-row"><label>PIX</label><span class="val" id="tot_pix">R$ 0,00</span></div>
+        <div class="field-row"><label>Desconto</label><span class="val" id="tot_desconto">R$ 0,00</span></div>
+      </div>
+
+      <div class="meta-box">
+        <div class="row1"><span>Total do mês</span><b id="mesTotal">R$ 0,00</b></div>
+        <div class="bar-track"><div class="bar-fill" id="metaBar" style="width:0%"></div></div>
+        <div class="meta-edit">
+          Meta do mês: R$ <input type="number" id="f_meta" step="1"> <span id="metaPct"></span>
+        </div>
+        <div class="row1" style="margin-top:12px; padding-top:10px; border-top:1px dashed var(--gold);">
+          <span>Estimativa de faturamento<span class="hint" style="display:block;">projetando a média diária de vendas para os dias que faltam</span></span>
+          <b id="estimativa">R$ 0,00</b>
+        </div>
+      </div>
+
+      <div class="hist">
+        <h3>Histórico de fechamentos</h3>
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <button class="btn secondary" id="btnExport" style="margin-top:0; flex:1;">Baixar backup (.json)</button>
+          <button class="btn secondary" id="btnImport" style="margin-top:0; flex:1;">Importar backup</button>
+          <input type="file" id="fileImport" accept="application/json" style="display:none;">
+        </div>
+        <table>
+          <thead>
+            <tr><th>Data</th><th>Recebido</th><th>Vendido</th><th>Diferença</th><th>Caixa final</th><th></th></tr>
+          </thead>
+          <tbody id="histBody"></tbody>
+        </table>
+        <div class="empty" id="histEmpty" style="display:none;">Nenhum dia fechado ainda. Feche o primeiro dia ao lado.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyD8ANutvJEQjLzW6Z4uHufhe1rXvX86RWc",
+  authDomain: "livro-caixa-9930d.firebaseapp.com",
+  projectId: "livro-caixa-9930d",
+  storageBucket: "livro-caixa-9930d.firebasestorage.app",
+  messagingSenderId: "93285522816",
+  appId: "1:93285522816:web:11e203b743117ed3a4f565"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+const BRL = v => (v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const $ = id => document.getElementById(id);
+const todayISO = () => new Date().toISOString().slice(0,10);
+
+document.getElementById('todayLabel').textContent = new Date().toLocaleDateString('pt-BR',{weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+
+let records = [];
+let config = { meta: 0 };
+let editingId = null;
+
+const inputs = ['f_data','f_caixaInicial','f_dinheiro','f_debitoInter','f_debitoStone','f_creditoInter','f_creditoStone','f_pixInter','f_pixConta','f_ifoodPg',
+  'f_vendaBalcao','f_vendaIfood','f_desconto','f_nfe','f_retiradas','f_caixaFinal'];
+
+auth.onAuthStateChanged(user => {
+  if(user){
+    $('loginOverlay').classList.add('hidden');
+    $('app-content').classList.remove('hidden');
+    loadAll();
+  }else{
+    $('loginOverlay').classList.remove('hidden');
+    $('app-content').classList.add('hidden');
+  }
+});
+
+$('btnLogin').addEventListener('click', async () => {
+  $('loginErro').textContent = '';
+  try{
+    await auth.signInWithEmailAndPassword($('loginEmail').value.trim(), $('loginSenha').value);
+  }catch(e){
+    $('loginErro').textContent = 'E-mail ou senha inválidos.';
+  }
+});
+$('loginSenha').addEventListener('keydown', e => { if(e.key === 'Enter') $('btnLogin').click(); });
+
+async function loadAll(){
+  try{
+    const snap = await db.collection('fechamentos').get();
+    records = snap.docs.map(d => d.data());
+  }catch(e){
+    records = [];
+    alert('Não foi possível carregar os dados do banco. Verifique sua conexão.');
+  }
+  try{
+    const cfgDoc = await db.collection('config').doc('geral').get();
+    config = cfgDoc.exists ? cfgDoc.data() : { meta: 0 };
+  }catch(e){ config = { meta: 0 }; }
+  $('f_meta').value = config.meta || '';
+  resetForm();
+  renderHistory();
+  renderTotalizadores();
+  renderMonth();
+}
+
+async function saveRecord(rec){
+  try{
+    await db.collection('fechamentos').doc(rec.id).set(rec);
+  }catch(e){
+    alert('Não foi possível salvar na nuvem. Verifique sua conexão e tente novamente.');
+    throw e;
+  }
+}
+async function deleteRecordRemote(id){
+  await db.collection('fechamentos').doc(id).delete();
+}
+async function saveConfig(){
+  try{
+    await db.collection('config').doc('geral').set(config);
+  }catch(e){ /* meta é secundária, ignora falha silenciosa */ }
+}
+
+function num(id){ return parseFloat($(id).value) || 0; }
+
+function computeTotals(){
+  const recebido = num('f_dinheiro')+num('f_debitoInter')+num('f_debitoStone')+num('f_creditoInter')+num('f_creditoStone')+num('f_pixInter')+num('f_pixConta')+num('f_ifoodPg');
+  const vendido = num('f_vendaBalcao')+num('f_vendaIfood')-num('f_desconto');
+  const diff = num('f_caixaInicial') + vendido - num('f_caixaFinal') - recebido;
+  return { recebido, vendido, diff };
+}
+
+function renderTotals(){
+  const t = computeTotals();
+  $('t_recebido').textContent = BRL(t.recebido);
+  $('t_vendido').textContent = BRL(t.vendido);
+  $('t_diff').textContent = BRL(t.diff);
+  const row = $('row_diff');
+  row.classList.remove('diff-ok','diff-bad');
+  row.classList.add(Math.abs(t.diff) < 0.01 ? 'diff-ok' : (t.diff < 0 ? 'diff-bad' : 'diff-ok'));
+}
+
+inputs.forEach(id => $(id).addEventListener('input', renderTotals));
+
+function lastCaixaFinal(){
+  if(records.length === 0) return 0;
+  const sorted = [...records].sort((a,b)=> a.data.localeCompare(b.data));
+  return sorted[sorted.length-1].caixaFinal || 0;
+}
+
+function resetForm(){
+  editingId = null;
+  $('f_data').value = todayISO();
+  $('f_caixaInicial').value = lastCaixaFinal().toFixed(2);
+  ['f_dinheiro','f_debitoInter','f_debitoStone','f_creditoInter','f_creditoStone','f_pixInter','f_pixConta','f_ifoodPg','f_vendaBalcao','f_vendaIfood','f_desconto','f_nfe','f_retiradas','f_caixaFinal']
+    .forEach(id => $(id).value = 0);
+  $('btnSalvar').textContent = 'Fechar o dia';
+  renderTotals();
+}
+
+$('btnNovo').addEventListener('click', resetForm);
+
+$('btnSalvar').addEventListener('click', async () => {
+  const data = $('f_data').value;
+  if(!data){ alert('Escolha a data do fechamento.'); return; }
+  const existing = records.find(r => r.data === data && r.id !== editingId);
+  if(existing && !confirm('Já existe um fechamento para ' + data.split('-').reverse().join('/') + '. Substituir?')) return;
+
+  const t = computeTotals();
+  const rec = {
+    id: data,
+    data,
+    caixaInicial: num('f_caixaInicial'),
+    dinheiro: num('f_dinheiro'),
+    debitoInter: num('f_debitoInter'), debitoStone: num('f_debitoStone'),
+    creditoInter: num('f_creditoInter'), creditoStone: num('f_creditoStone'),
+    pixInter: num('f_pixInter'), pixConta: num('f_pixConta'), ifoodPg: num('f_ifoodPg'),
+    vendaBalcao: num('f_vendaBalcao'), vendaIfood: num('f_vendaIfood'),
+    desconto: num('f_desconto'), nfe: num('f_nfe'), retiradas: num('f_retiradas'),
+    recebido: t.recebido, vendido: t.vendido, diff: t.diff, caixaFinal: num('f_caixaFinal')
+  };
+  try{
+    await saveRecord(rec);
+    if(editingId && editingId !== data){ await deleteRecordRemote(editingId); records = records.filter(r => r.id !== editingId); }
+  }catch(e){ return; }
+  records = records.filter(r => r.data !== data);
+  records.push(rec);
+  renderHistory(); renderTotalizadores(); renderMonth();
+  resetForm();
+});
+
+function renderHistory(){
+  const tbody = $('histBody');
+  const sorted = [...records].sort((a,b)=> b.data.localeCompare(a.data));
+  tbody.innerHTML = '';
+  $('histEmpty').style.display = sorted.length ? 'none' : 'block';
+  sorted.forEach(r => {
+    const tr = document.createElement('tr');
+    const dataFmt = r.data.split('-').reverse().join('/');
+    tr.innerHTML = `
+      <td>${dataFmt}</td>
+      <td>${BRL(r.recebido)}</td>
+      <td>${BRL(r.vendido)}</td>
+      <td class="${r.diff < -0.009 ? 'diff-neg' : 'diff-pos'}">${BRL(r.diff)}</td>
+      <td>${BRL(r.caixaFinal)}</td>
+      <td class="del" title="Excluir">✕</td>
+    `;
+    tr.querySelector('.del').addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      if(confirm('Excluir o fechamento de ' + dataFmt + '?')){
+        await deleteRecordRemote(r.id);
+        records = records.filter(x => x.id !== r.id);
+        renderHistory(); renderTotalizadores(); renderMonth();
+        if(editingId === r.id) resetForm();
+      }
+    });
+    tr.addEventListener('click', () => loadIntoForm(r));
+    tbody.appendChild(tr);
+  });
+}
+
+function loadIntoForm(r){
+  editingId = r.id;
+  $('f_data').value = r.data;
+  $('f_caixaInicial').value = r.caixaInicial;
+  $('f_dinheiro').value = r.dinheiro;
+  $('f_debitoInter').value = r.debitoInter || 0; $('f_debitoStone').value = r.debitoStone || 0;
+  $('f_creditoInter').value = r.creditoInter || 0; $('f_creditoStone').value = r.creditoStone || 0;
+  $('f_pixInter').value = r.pixInter || 0; $('f_pixConta').value = r.pixConta || 0;
+  $('f_ifoodPg').value = r.ifoodPg;
+  $('f_vendaBalcao').value = r.vendaBalcao; $('f_vendaIfood').value = r.vendaIfood;
+  $('f_desconto').value = r.desconto; $('f_nfe').value = r.nfe; $('f_retiradas').value = r.retiradas;
+  $('f_caixaFinal').value = r.caixaFinal || 0;
+  $('btnSalvar').textContent = 'Atualizar fechamento de ' + r.data.split('-').reverse().join('/');
+  renderTotals();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function renderTotalizadores(){
+  const ym = new Date().toISOString().slice(0,7);
+  const doMes = records.filter(r => r.data.startsWith(ym));
+  const soma = campo => doMes.reduce((s,r)=> s + (r[campo]||0), 0);
+  $('tot_debito').textContent = BRL(soma('debitoInter') + soma('debitoStone'));
+  $('tot_credito').textContent = BRL(soma('creditoInter') + soma('creditoStone'));
+  $('tot_ifood').textContent = BRL(soma('ifoodPg'));
+  $('tot_pix').textContent = BRL(soma('pixInter') + soma('pixConta'));
+  $('tot_desconto').textContent = BRL(soma('desconto'));
+}
+
+function renderMonth(){
+  const now = new Date();
+  const ym = now.toISOString().slice(0,7);
+  const doMes = records.filter(r => r.data.startsWith(ym));
+  const mesTotal = doMes.reduce((s,r)=> s + r.recebido, 0);
+  $('mesTotal').textContent = BRL(mesTotal);
+  const meta = config.meta || 0;
+  const pct = meta > 0 ? Math.min(100, (mesTotal/meta)*100) : 0;
+  $('metaBar').style.width = pct + '%';
+  $('metaPct').textContent = meta > 0 ? pct.toFixed(0) + '%' : '';
+
+  const diasFechados = doMes.length;
+  const totalVendidoMes = doMes.reduce((s,r)=> s + r.vendido, 0);
+  const mediaDiaria = diasFechados > 0 ? totalVendidoMes / diasFechados : 0;
+  const diasNoMes = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const diasRestantes = Math.max(0, diasNoMes - now.getDate());
+  const estimativa = totalVendidoMes + (mediaDiaria * diasRestantes);
+  $('estimativa').textContent = BRL(estimativa);
+}
+
+$('f_meta').addEventListener('change', async () => {
+  config.meta = parseFloat($('f_meta').value) || 0;
+  await saveConfig();
+  renderMonth();
+});
+
+$('btnExport').addEventListener('click', () => {
+  const payload = { records, config, exportadoEm: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'livro-caixa-backup-' + todayISO() + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+$('btnImport').addEventListener('click', () => $('fileImport').click());
+
+$('fileImport').addEventListener('change', (ev) => {
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try{
+      const payload = JSON.parse(e.target.result);
+      const incoming = Array.isArray(payload.records) ? payload.records : [];
+      if(records.length > 0 && !confirm('Isso vai juntar ' + incoming.length + ' fechamento(s) do backup com os ' + records.length + ' já salvos aqui (fechamentos com a mesma data serão substituídos pelo backup). Continuar?')) return;
+      for(const rec of incoming){
+        if(!rec.id) rec.id = rec.data;
+        await saveRecord(rec);
+        records = records.filter(r => r.data !== rec.data);
+        records.push(rec);
+      }
+      if(payload.config){ config = payload.config; await saveConfig(); }
+      $('f_meta').value = config.meta || '';
+      renderHistory(); renderTotalizadores(); renderMonth(); resetForm();
+      alert('Backup importado com sucesso.');
+    }catch(err){
+      alert('Não foi possível ler esse arquivo de backup.');
+    }
+    ev.target.value = '';
+  };
+  reader.readAsText(file);
+});
+</script>
+</body>
+</html>
